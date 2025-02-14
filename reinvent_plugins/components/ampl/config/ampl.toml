@@ -1,0 +1,103 @@
+# REINVENT4 TOML input example for sampling
+#
+
+
+run_type = "staged_learning"
+device = "cpu"  # set torch device e.g. "cpu", cuda:0
+json_out_config = "_ampl.json"  # write this TOML to JSON
+
+
+[parameters]
+
+# Uncomment one of the comment blocks below.  Each generator needs a model
+# file and possibly a SMILES file with seed structures.
+
+## Reinvent
+prior_file = "priors/reinvent.prior"
+agent_file = "priors/reinvent.prior"
+
+## LibInvent
+#prior_file = "priors/libinvent.prior"
+#agent_file = "priors/libinvent.prior"
+#smiles_file = "configs/toml/scaffolds.smi"  # 1 scaffold per line with attachment points
+
+batch_size = 256          # network
+
+unique_sequences = true  # if true remove all duplicates raw sequences in each step
+                         # only here for backward compatibility
+randomize_smiles = true  # if true shuffle atoms in SMILES randomly
+
+[learning_strategy]
+
+type = "dap"      # dap: only one supported
+sigma = 32       # sigma of the RL reward function
+rate = 0.0001     # for torch.optim
+
+[diversity_filter]  # optional, comment section out or remove if unneeded
+                    # NOTE: also memorizes all seen SMILES
+
+type = "IdenticalMurckoScaffold" # IdenticalTopologicalScaffold,
+                                 # ScaffoldSimilarity, PenalizeSameSmiles
+bucket_size = 25                 # memory size in number of compounds
+minscore = 0.6                   # only memorize if this threshold is exceeded
+minsimilarity = 0.4              # minimum similarity for ScaffoldSimilarity
+penalty_multiplier = 0.5         # penalty factor for PenalizeSameSmiles
+
+### Stage 1
+### Note that stages must always be a list i.e. double brackets
+[[stage]]
+
+chkpt_file = '/home/overhulsejm/reinvent4/REINVENT4/contrib/reinvent_plugins/components/ampl/rl_run.chkpt'  # Edit this checkpoint file path
+termination = "simple"  # termination criterion fot this stage
+max_score = 0.7  # terminate if this total score is exceeded
+min_steps = 25  # run for at least this number of steps
+max_steps = 1000  # terminate entire run when exceeded
+
+[stage.scoring]
+type = "geometric_mean"  # aggregation function
+
+#[[stage.scoring.component]]
+#[[stage.scoring.component.AMPLPredictionModelpic50.endpoint]]
+#name = "amplscorer_pic50"
+#weight = 1.5
+#
+##params.ampl_image = "/home/overhulsejm/AMPL_singularity/ampl.sif"  ### AMPL 1.5
+#params.ampl_image = "/home/overhulsejm/ampl16_sing/ampl.sif"    ### AMPL 1.6
+#params.container_type = "singularity"
+#params.target_col_name =  "avg_pic50"
+#params.working_directory = "/home/overhulsejm/reinvent4/reinvent/reinvent_plugins/components/ampl"
+
+# Scoring components about drug-likeness, synthesizability & reactions:
+[[stage.scoring.component]]
+[stage.scoring.component.SAScore]
+[[stage.scoring.component.SAScore.endpoint]]
+name = "Transformed SA score"
+weight = 1
+params.transform = "inverse"
+params.epsilon = 0.01
+
+[[stage.scoring.component]]
+[stage.scoring.component.QED]
+[[stage.scoring.component.QED.endpoint]]
+name = "QED"
+weight = 0.3
+
+[[stage.scoring.component]]
+[[stage.scoring.component.AMPLPredictionModelhomolumo.endpoint]]
+name = "amplscorer_homolumo"
+weight = 2
+
+params.ampl_image = "/home/overhulsejm/AMPL_singularity/ampl.sif"
+params.container_type = "singularity"
+params.target_col_name =  "HOMO_LUMO_gap"
+params.working_directory = "/home/overhulsejm/reinvent4/reinvent/reinvent_plugins/components/ampl2"
+
+#[[stage.scoring.component]]
+#[[stage.scoring.component.AMPLPredictionModelhomolumo.endpoint]]
+#name = "amplscorer_homolumo"
+#weight = 1
+#params.ampl_image = "/home/overhulsejm/ampl16_sing/ampl.sif"
+#params.container_type = "singularity"
+#params.target_col_name =  "VALUE_NUM_mean"
+#params.working_directory = "/home/overhulsejm/reinvent4/reinvent/reinvent_plugins/components/ampl2"
+
